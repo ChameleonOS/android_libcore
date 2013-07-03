@@ -359,19 +359,25 @@ public class ZipEntry implements ZipConstants, Cloneable {
              throw new ZipException("Central Directory Entry not found");
         }
 
-        it.seek(10);
-        compressionMethod = it.readShort();
-        time = it.readShort();
-        modDate = it.readShort();
+        it.seek(8);
+        int gpbf = it.readShort() & 0xffff;
+
+        if ((gpbf & ZipFile.GPBF_UNSUPPORTED_MASK) != 0) {
+            throw new ZipException("Invalid General Purpose Bit Flag: " + gpbf);
+        }
+
+        compressionMethod = it.readShort() & 0xffff;
+        time = it.readShort() & 0xffff;
+        modDate = it.readShort() & 0xffff;
 
         // These are 32-bit values in the file, but 64-bit fields in this object.
         crc = ((long) it.readInt()) & 0xffffffffL;
         compressedSize = ((long) it.readInt()) & 0xffffffffL;
         size = ((long) it.readInt()) & 0xffffffffL;
 
-        nameLength = it.readShort();
-        int extraLength = it.readShort();
-        int commentLength = it.readShort();
+        nameLength = it.readShort() & 0xffff;
+        int extraLength = it.readShort() & 0xffff;
+        int commentByteCount = it.readShort() & 0xffff;
 
         // This is a 32-bit value in the file, but a 64-bit field in this object.
         it.seek(42);
@@ -383,9 +389,9 @@ public class ZipEntry implements ZipConstants, Cloneable {
 
         // The RI has always assumed UTF-8. (If GPBF_UTF8_FLAG isn't set, the encoding is
         // actually IBM-437.)
-        if (commentLength > 0) {
-            byte[] commentBytes = new byte[commentLength];
-            Streams.readFully(in, commentBytes, 0, commentLength);
+        if (commentByteCount > 0) {
+            byte[] commentBytes = new byte[commentByteCount];
+            Streams.readFully(in, commentBytes, 0, commentByteCount);
             comment = new String(commentBytes, 0, commentBytes.length, Charsets.UTF_8);
         }
 
